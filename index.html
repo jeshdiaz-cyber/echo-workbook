@@ -2253,6 +2253,23 @@ function parseDate(s){
   const p2 = n => String(n).padStart(2, '0'); return { y, mo, d, date: dt, str: p2(mo) + '-' + p2(d) + '-' + y };
 }
 
+/* ---------- thrombus, vegetation or mass entered on the embolism or RV pages feeds the workbook's own critical-result field ---------- */
+DEFAULTS['Qual!AUTO_mass'] = null;                         // remembers what was filled in automatically, so a hand-typed entry is never overwritten
+function autoMass(){
+  const sites = [QS('EM_laa') === 'Thrombus' && 'left atrium or appendage' + (dims('EM_laal', 'EM_laaw') ? ', ' + dims('EM_laal', 'EM_laaw') : ''),
+    QS('TH_mass') === 'Present' && 'left ventricle' + (dims('TH_d1', 'TH_d2') ? ', ' + dims('TH_d1', 'TH_d2') : '') + (QS('TH_mob') === 'Mobile' ? ', mobile' : ''),
+    QS('EM_pvt') === 'Favours thrombus' && 'prosthetic valve'].filter(Boolean);
+  if (QS('RS_thr') === 'Present') return ['Thrombus in transit', 'right heart' + (sites.length ? '; also thrombus in the ' + sites.join(' and the ') : '')];
+  if (sites.length) return ['Intracardiac thrombus', sites.join('; ')];
+  const veg = QS('EM_veg'); if (veg === 'Present' || veg === 'Possible') return ['Suspected vegetation', [QS('EM_vegloc').toLowerCase(), dims('EM_vegsz', 'EM_vegw'), QS('EM_vegmob') && QS('EM_vegmob').toLowerCase()].filter(Boolean).join(', ')];
+  const tum = QS('EM_tum'); if (tum && tum !== 'None') return ['Intracardiac mass (other)', [tum.replace(' likely', '').toLowerCase(), dims('EM_tumsz', 'EM_tumsz2')].filter(Boolean).join(', ')];
+  return null;
+}
+/* one line for the summary statement: the embolic sources found */
+function embolismLine(){ const s = embolicSources(); if (!s.hi.length && !s.lo.length) return '';
+  return 'Cardiac source of embolism: ' + [s.hi.length && 'high potential: ' + s.hi.join(', '), s.lo.length && 'low potential: ' + s.lo.join(', ')].filter(Boolean).join('; ') + '.'; }
+function summaryText(){ const base = String(g('Report!B4') || ''), e = embolismLine(); return e ? (/^Enter measurements/.test(base) ? e : base + '\n' + e) : base; }
+
 /* ---------- app core ---------- */
 const M = MODEL;
 const K = (s, a) => s + '!' + a;
@@ -3092,6 +3109,14 @@ function cmpBlock(){
 }
 const CMP_NOTE = 'Prompts worked out from the numbers entered, to suggest what to look for. They are not diagnoses and are not added to the report.';
 
+/* keep the report's mass / thrombus field in step with the embolism and RV entries, unless it was filled in by hand */
+{ let busy = 0; const kM = 'Report!B26', kL = 'Report!B27', kA = 'Qual!AUTO_mass';
+  const plan = () => { const auto = autoMass(), cur = [INPUTS[kM] == null || INPUTS[kM] === 'None' ? '' : String(INPUTS[kM]), INPUTS[kL] == null ? '' : String(INPUTS[kL])], mark = INPUTS[kA], curIsAuto = !!mark && mark === JSON.stringify(cur), curEmpty = !cur[0] && !cur[1], want = auto ? JSON.stringify(auto) : null;
+    return (auto && (curEmpty || curIsAuto) && want !== JSON.stringify(cur)) || (!auto && curIsAuto) ? { auto, want } : null; };
+  bind(() => { if (busy || !plan()) return;
+    busy = 1; setTimeout(() => { busy = 0; const p = plan(); if (!p) return;          // work from the entries as they are now, not as they were when this was scheduled
+      INPUTS[kL] = p.auto ? p.auto[1] : null; INPUTS[kA] = p.want; for (const c of controls) if (c.key === kL) c.sync(); setIn(kM, p.auto ? p.auto[0] : null); }, 0); }); }
+
 /* ---------- warn when a free-text box seems to hold a patient identifier ---------- */
 function scanFree(){
   for (const n of document.querySelectorAll('[data-free]')){ if (n.dataset.free === 'Echo!B11') continue;          // the study entry date is meant to be a date
@@ -3105,8 +3130,8 @@ bind(scanFree);
 page('overview', 'Study overview', 'start', root => {
   const patient = vtext('p', 'Report!B61', 'patient');
   const statement = el('p', { class: 'statement' });
-  const card = el('section', { class: 'card' }, el('h2', null, 'Summary statement', el('button', { class: 'btn small', type: 'button', onclick: () => copyText(String(g('Report!B4') || ''), 'Summary statement') }, 'Copy')), patient, statement);
-  bind(() => { const f = fmt('Report!B4'); statement.textContent = f.t; card.classList.toggle('crit', f.t.startsWith('CRITICAL')); });
+  const card = el('section', { class: 'card' }, el('h2', null, 'Summary statement', el('button', { class: 'btn small', type: 'button', onclick: () => copyText(summaryText(), 'Summary statement') }, 'Copy')), patient, statement);
+  bind(() => { const t = summaryText(); statement.textContent = t; card.classList.toggle('crit', /^(CRITICAL|URGENT)/.test(t)); });
   const items = [['LVEF', 'Echo!D43', 'Echo!B43', '%'], ['LV geometry', 'Echo!D34'], ['Wall motion', 'Wall Motion!D29'], ['Diastolic function, ASE 2025', 'Diastology 2025!D91'], ['Diastolic function, ASE/EACVI 2016', 'Echo!D200'],
     ['RV systolic function', 'Echo!D220'], ['Aortic stenosis', 'Echo!D96'], ['Aortic regurgitation', 'Echo!D110'], ['Mitral stenosis', 'Echo!D125'], ['Mitral regurgitation', 'Echo!D144'], ['Tricuspid regurgitation', 'Echo!D157'],
     ['Pulmonary hypertension', 'Echo!D238'], ['Right atrial pressure', 'Echo!D225', 'Echo!B225', ' mmHg'], ['Aorta', 'Echo!D255'], ['Pericardium', 'Echo!D258']];
@@ -3852,9 +3877,9 @@ page('report', 'Report', 'report', root => {
     }
   }
   const statement = el('p', { class: 'statement' });
-  const sumCard = el('section', { class: 'card' }, el('h2', null, 'Summary statement', el('button', { class: 'btn small primary', type: 'button', onclick: () => copyText(String(g('Report!B4') || ''), 'Summary statement') }, 'Copy summary')), statement,
+  const sumCard = el('section', { class: 'card' }, el('h2', null, 'Summary statement', el('button', { class: 'btn small primary', type: 'button', onclick: () => copyText(summaryText(), 'Summary statement') }, 'Copy summary')), statement,
     el('p', { class: 'p-ref', style: 'margin-top:10px' }, 'Generated automatically. Review and edit before signing: this is decision support, not a final read.'));
-  bind(() => { const t = fmt('Report!B4').t; statement.textContent = t; sumCard.classList.toggle('crit', t.startsWith('CRITICAL')); });
+  bind(() => { const t = summaryText(); statement.textContent = t; sumCard.classList.toggle('crit', /^(CRITICAL|URGENT)/.test(t)); });
   const checks = el('ul', { class: 'checks' });
   for (const r of R.checks){ const li = el('li'); bind(() => { const t = fmt(K(S, 'B' + r)).t; li.textContent = t; li.className = t.startsWith('⚠') ? 'bad' : t.startsWith('✔') ? 'ok' : ''; li.hidden = !t; }); add(checks, li); }
   const prev = el('dl', { class: 'preview' });
@@ -3899,6 +3924,7 @@ page('guide', 'Guide', 'ref', root => {
     ['Calculators', 'Sixteen calculators that start from the study values, plus a diastology calculator that changes its inputs with the population chosen. A what-if number overrides one input in that calculator only.'],
     ['Congenital', 'A page for adults with congenital heart disease: segmental anatomy, then atrial and ventricular septal defects, patent duct, bicuspid valve, subaortic stenosis, coarctation and left superior vena cava, each with the items the reporting standard asks for. Repaired and complex lesions are recorded and flagged for referral to an adult congenital centre.'],
     ['Study code and privacy', 'Each study is labelled with a random code such as V-7K3Q, which is not built from anything about the patient; the optional series letter (V, M or R) only sets its first character, and you can type your own entry instead. The tool does not ask for a name or a date of birth, and it warns when a free-text box seems to contain a name, a date, a record number, a phone number or an email address. Keep the list that links codes to patients inside your hospital’s own system.'],
+    ['Embolism in the report', 'Embolic sources entered on the Cardiac embolism page add one line to the summary statement. A thrombus, vegetation or mass entered there, or a thrombus in transit in the right-ventricle section, also fills in the report’s own “Intracardiac mass / thrombus / vegetation” field, so it appears as an urgent or critical result and asks for the communication to be documented. If you fill in that field by hand, your entry is kept.'],
     ['Cardiac embolism', 'A page for studies that ask about a cardiac source of embolism: left atrium and appendage, left ventricle, valves, masses, thoracic aorta and shunts, with a summary that sorts the findings into high and low embolic potential.'],
     ['Cardiomyopathies', 'Its own page: a summary table gives every type a status (hypertrophic, thick walls and amyloid, dilated and non-dilated, restrictive, hypertrabeculation, arrhythmogenic RV, takotsubo syndrome), and each type has a section laid out the same way: what it is, what the study already says, what to enter, and the result. The statuses are prompts worked out from the numbers, not diagnoses.'],
     ['Formulas', 'Under each calculated value is the formula it came from, followed by the same formula with the patient’s numbers in it.'],
@@ -4020,7 +4046,7 @@ async function scrubSaved(){
 }
 function snapshotRecord(){
   const ins = {}; for (const k in INPUTS) if (INPUTS[k] != null && INPUTS[k] !== '' && !k.startsWith('Calculators!')) ins[k] = INPUTS[k];
-  const st = String(g('Report!B4') || ''), ef = g('Echo!B43');
+  const st = summaryText(), ef = g('Echo!B43');
   const rec = { savedAt: new Date().toISOString(), pid: String(INPUTS['Echo!B10'] == null ? '' : INPUTS['Echo!B10']), date: String(INPUTS['Echo!B11'] == null ? '' : INPUTS['Echo!B11']),
     statement: st.slice(0, 600), crit: st.startsWith('CRITICAL'), n: Object.keys(ins).filter(k => !MUST.includes(k)).length, inputs: JSON.stringify(ins) };
   if (typeof ef === 'number') rec.lvef = Math.round(ef * 10) / 10;
