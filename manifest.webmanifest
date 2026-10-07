@@ -1,0 +1,29 @@
+{
+ "name": "Echo workbook",
+ "short_name": "Echo workbook",
+ "description": "Transthoracic echo interpretation workbook. Educational aid; not a medical device.",
+ "start_url": "./",
+ "scope": "./",
+ "display": "standalone",
+ "orientation": "any",
+ "background_color": "#F1F4F7",
+ "theme_color": "#0A6C8F",
+ "icons": [
+  {
+   "src": "icons/icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "icons/icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  },
+  {
+   "src": "icons/icon-512-maskable.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ]
+}
