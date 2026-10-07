@@ -366,7 +366,7 @@ details.more summary{cursor:pointer; font:600 15px var(--head); color:var(--acce
 .prec span{font-size:14px; color:var(--muted); text-align:right}
 .prec small{grid-column:1 / -1; font-size:13px; color:var(--muted)}
 .pback{display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--warn-bg); color:var(--warn); border-radius:var(--r-sm); padding:9px 12px; margin-bottom:10px; font-size:14px}
-@media (max-width:820px){ .bar #clear{display:none} .only-m{display:block} .bar h1{min-width:0} }
+@media (max-width:820px){ .bar .lg{display:none} .bar{gap:8px} .bar .btn.small{padding-left:10px; padding-right:10px; white-space:nowrap} .only-m{display:block} .bar h1{min-width:0} }
 
 td.dd{background:color-mix(in srgb,var(--warn-bg) 55%,transparent)}
 #page-studies td .chip{font-size:13px}
@@ -477,8 +477,8 @@ td.dd{background:color-mix(in srgb,var(--warn-bg) 55%,transparent)}
     <div class="meter"><span id="meter-t"></span><span class="track"><span class="fill" id="meter-f"></span></span></div>
     <span class="flag" id="flag"></span>
     <span class="savest" id="savest"></span>
-    <button class="btn small" id="openbtn" type="button">Open saved</button>
-    <button class="btn small primary" id="save" type="button">Save study</button>
+    <button class="btn small" id="openbtn" type="button">Open<span class="lg"> saved</span></button>
+    <button class="btn small primary" id="save" type="button">Save<span class="lg"> study</span></button>
     <button class="btn small" id="clear" type="button">Clear all</button>
   </header>
   <div id="pages"></div>
@@ -4037,7 +4037,7 @@ async function saveFile(filename, text){
   try { const url = URL.createObjectURL(blob), a = el('a', { href: url, download: filename }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); }
   catch (e) { toast('The file could not be saved from here.'); }
 }
-function twiceBtn(btn, label, fn){ let armed = 0; btn.addEventListener('click', () => { if (armed){ clearTimeout(armed); armed = 0; btn.textContent = label; fn(); } else { btn.textContent = 'Click again to confirm'; armed = setTimeout(() => { armed = 0; btn.textContent = label; }, 3000); } }); return btn; }
+function twiceBtn(btn, label, fn){ let armed = 0; btn.addEventListener('click', () => { if (armed){ clearTimeout(armed); armed = 0; btn.textContent = label; fn(); } else { btn.textContent = matchMedia('(max-width:820px)').matches ? 'Tap again' : 'Click again to confirm'; armed = setTimeout(() => { armed = 0; btn.textContent = label; }, 3000); } }); return btn; }
 page('studies', 'Saved studies', 'report', root => {
   const where = el('p', { class: 'lead' }), tb = el('tbody'), empty = el('p', { class: 'lead', style: 'padding:16px;margin:0' }), move = el('p', { class: 'p-ref', hidden: true, style: 'margin-bottom:12px' });
   const stamp = () => new Date().toISOString().slice(0, 10);
@@ -4167,7 +4167,7 @@ function buildShell(){
   twice($('#clear'), 'Clear all', clearAll); twice($('#clear2'), 'Clear all', clearAll);
   $('#openbtn').addEventListener('click', openPicker);
   const saveBtn = $('#save');
-  saveBtn.addEventListener('click', async () => { saveBtn.disabled = true; saveBtn.textContent = 'Saving'; try { await saveCurrent(false); } finally { saveBtn.disabled = false; saveBtn.textContent = 'Save study'; } });
+  saveBtn.addEventListener('click', async () => { saveBtn.disabled = true; saveBtn.textContent = 'Saving'; try { await saveCurrent(false); } finally { saveBtn.disabled = false; saveBtn.replaceChildren('Save', el('span', { class: 'lg' }, ' study')); } });
   bind(() => { const st = $('#savest'); st.textContent = current.id ? (dirty ? 'Unsaved changes' : 'Saved') : (dirty ? 'Not saved' : ''); st.classList.toggle('warn', dirty); });
   twice($('#new'), 'New study', () => { const had = filled(INPUTS); loadStudy(blankStudy()); if (had) toast('New study started', 'Undo', undo); else toast('New study started'); });
   twice($('#example'), 'Load example', () => { loadStudy(exampleStudy()); toast('Example study loaded'); });
