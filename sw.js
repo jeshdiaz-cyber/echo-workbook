@@ -1,5 +1,5 @@
 /* Echo workbook: offline cache. The version changes whenever index.html changes, so replacing the files updates the app. */
-const VERSION = 'echo-workbook-b5ac41f5585b';
+const VERSION = 'echo-workbook-2630918f61e2';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION && k !== 'echo-workbook-fonts').map(k => caches.delete(k)))).then(() => self.clients.claim())); });

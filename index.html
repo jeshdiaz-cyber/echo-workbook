@@ -473,6 +473,12 @@ td.dd{background:color-mix(in srgb,var(--warn-bg) 55%,transparent)}
 
 .phiwarn{flex-basis:100%; display:block; margin-top:4px; padding:5px 9px; border-radius:6px; background:var(--warn-bg, #FBEFD5); color:var(--warn); font-size:13px; font-weight:600}
 
+#ack{position:fixed; inset:0; z-index:200; display:grid; place-items:center; padding:18px; background:rgba(10,16,22,.62); overflow:auto}
+.ackbox{background:var(--surface); color:var(--ink); border-radius:var(--r, 12px); border:1px solid var(--line-2); box-shadow:0 18px 50px rgba(0,0,0,.35); padding:24px 26px; max-width:620px; width:100%}
+.ackbox h2{margin:0 0 6px; font:600 21px var(--head)}
+.ackbox .rules{margin:12px 0 0; display:grid; gap:8px; font-size:15px; padding-left:20px}
+@media print{ #ack{display:none} }
+
 </style>
 </head>
 <body>
@@ -482,7 +488,7 @@ td.dd{background:color-mix(in srgb,var(--warn-bg) 55%,transparent)}
     <div><b>Echo workbook</b><span>Transthoracic echo interpretation</span></div>
   </div>
   <div class="tools">
-    <button class="btn" id="new" type="button">New study</button>
+    <button class="btn" id="new" type="button">Start a new case</button>
     <button class="btn only-m" id="clear2" type="button">Clear all</button>
     <button class="btn" id="example" type="button">Load example</button>
     <button class="btn quiet" id="theme" type="button">Switch light or dark</button>
@@ -3117,6 +3123,26 @@ const CMP_NOTE = 'Prompts worked out from the numbers entered, to suggest what t
     busy = 1; setTimeout(() => { busy = 0; const p = plan(); if (!p) return;          // work from the entries as they are now, not as they were when this was scheduled
       INPUTS[kL] = p.auto ? p.auto[1] : null; INPUTS[kA] = p.want; for (const c of controls) if (c.key === kL) c.sync(); setIn(kM, p.auto ? p.auto[0] : null); }, 0); }); }
 
+/* ---------- acceptance of the educational notice: asked once on each device ---------- */
+const ACK_KEY = 'echo-workbook-ack-v1';
+const ackDate = () => { try { const v = JSON.parse(localStorage.getItem(ACK_KEY) || 'null'); return v && v.at ? v.at : (localStorage.getItem(ACK_KEY) ? 'earlier' : ''); } catch (e) { try { return localStorage.getItem(ACK_KEY) ? 'earlier' : ''; } catch (x) { return ''; } } };
+function showAck(again){
+  if ($('#ack')) return;
+  const others = [$('#rail'), $('main')].filter(Boolean), done = () => { wrap.remove(); for (const o of others) o.inert = false; refresh(); };
+  const ok = el('button', { class: 'btn primary', type: 'button', onclick: () => { try { localStorage.setItem(ACK_KEY, JSON.stringify({ at: new Date().toISOString() })); } catch (e) {} done(); } }, 'I understand and accept');
+  const wrap = el('div', { id: 'ack', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ack-t' }, el('div', { class: 'ackbox' },
+    el('h2', { id: 'ack-t' }, 'Before you use this tool'),
+    el('p', { class: 'p-ref', style: 'font-size:14px' }, 'Developed by Jesus Diaz Acevedo, MD, MPH · Cardiology Fellow'),
+    el('ul', { class: 'rules' }, [
+      'It is an educational aid, not a medical device, and it has not been validated or approved by any authority.',
+      'Its calculations, cut-offs and suggested wording may contain errors. Check every result against the primary source and the clinical picture.',
+      'The interpreting physician remains responsible for the report and for every clinical decision.',
+      'Do not enter patient names, record numbers, dates of birth or contact details.',
+      'It is provided as is, without warranty. The full notice is on the Guide page.'].map(t => el('li', null, t))),
+    el('div', { style: 'display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px' }, ok, again ? el('button', { class: 'btn', type: 'button', onclick: done }, 'Close') : el('span', { class: 'p-ref' }, 'You need to accept to continue.'))));
+  for (const o of others) o.inert = true; document.body.append(wrap); ok.focus();
+}
+
 /* ---------- warn when a free-text box seems to hold a patient identifier ---------- */
 function scanFree(){
   for (const n of document.querySelectorAll('[data-free]')){ if (n.dataset.free === 'Echo!B11') continue;          // the study entry date is meant to be a date
@@ -3174,7 +3200,8 @@ page('overview', 'Study overview', 'start', root => {
       el('li', null, link('views', 'Views and completeness'), el('span', null, 'What to measure in each view and what is still missing.')))),
     el('section', { class: 'card' }, el('h3', null, el('i', null, '3'), 'Finish the report'), el('ul', null,
       el('li', null, link('report', 'Report'), el('span', null, 'Indication, image quality and prior study, then copy the summary or the full report.')))));
-  add(root, el('div', { class: 'ov' }, el('div', { style: 'display:grid;gap:18px' }, card, glance, el('section', { class: 'card' }, el('h2', null, 'Cardiomyopathy suggestion'), cmpBlock(), el('p', { class: 'p-ref', style: 'margin-top:10px' }, 'Worked out from the numbers entered; not diagnoses. Details on the ', link('cmp', 'Cardiomyopathies page'), '.'))), el('div', { style: 'display:grid;gap:18px' }, wm, comp)), steps,
+  add(root, el('div', { class: 'toolbar' }, el('button', { class: 'btn primary', type: 'button', data: { newcase: '1' } }, 'Start a new case'), el('span', { class: 'p-ref' }, 'Empties the fields, collapses every section and opens Echo measurements.')),
+    el('div', { class: 'ov' }, el('div', { style: 'display:grid;gap:18px' }, card, glance, el('section', { class: 'card' }, el('h2', null, 'Cardiomyopathy suggestion'), cmpBlock(), el('p', { class: 'p-ref', style: 'margin-top:10px' }, 'Worked out from the numbers entered; not diagnoses. Details on the ', link('cmp', 'Cardiomyopathies page'), '.'))), el('div', { style: 'display:grid;gap:18px' }, wm, comp)), steps,
     el('p', { class: 'foot' }, M.echoNote));
 });
 
@@ -3931,13 +3958,14 @@ page('guide', 'Guide', 'ref', root => {
     ['Report', 'Summary statement first (critical results, LV and RV function, valve disease, key positives, pertinent negatives, image quality, comparison), then findings by structure and a single block to paste into the record.'],
     ['Saving and the database', 'What you type is kept as a draft in this browser, so a refresh does not lose it. “Save study” adds the study to your database, listed on the Saved studies page: when the page is opened in Claude that database is your own private space and follows you across devices; otherwise it stays in this browser. From there you can reopen or delete a study, export every study as one spreadsheet, and export or import a backup. Use a study code as the patient ID unless your institution allows identifiers.'],
     ['Opening earlier studies', '“Open saved” at the top lists every saved study with a search box; choose one to put it back on screen. Whatever it replaces is kept, even if it was never saved, and can be brought back from the same list or with Undo.'],
-    ['Clearing', '“Clear all” at the top empties every box, including the report details and what-if values; saved studies are not touched. “New study” in the side panel clears the patient data but keeps the lab set-up choices. “Load example” fills in a sample patient.'],
+    ['Starting and clearing', '“Start a new case”, on the Study overview and in the side panel, empties the measurement fields, keeps the lab set-up choices, collapses every section and opens Echo measurements. “Clear all” at the top empties every box, including the set-up choices and what-if values. Saved studies are not touched by either, and an Undo appears for a few seconds. “Load example” fills in a sample patient.'],
     ['Colour code', 'Green: normal. Amber: mild, moderate, borderline or indeterminate. Red: severe or abnormal. Colours are chosen from keywords in the interpretation text, with the same rules as the Excel workbook.'],
   ].concat(M.guideRef.map(r => [r.a, r.b]));
   const dl = el('dl', { class: 'guide' });
   for (const [a, b] of rows) add(dl, el('dt', null, a), el('dd', null, b));
   add(root, el('section', { class: 'card' }, dl),
     el('section', { class: 'card', id: 'guide-legal', style: 'margin-top:18px' }, el('h2', null, 'About this tool, educational use and legal notice'),
+      (() => { const p = el('p', { class: 'p-ref', style: 'display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px' }), t = el('span'); bind(() => { const d = ackDate(); t.textContent = d ? 'You accepted this notice on this device' + (d === 'earlier' ? '.' : ' on ' + new Date(d).toLocaleDateString() + '.') : 'Not yet accepted on this device.'; }); add(p, t, el('button', { class: 'btn small', type: 'button', onclick: () => showAck(true) }, 'Show the notice')); return p; })(),
       el('p', { class: 'statement', style: 'font-size:16px;margin-bottom:10px' }, el('b', null, 'Developed by Jesus Diaz Acevedo, MD, MPH'), ', Cardiology Fellow. © 2026 Jesus Diaz Acevedo.'),
       el('ul', { class: 'rules', style: 'max-width:90ch' }, [
         'This is a personal educational project of its author. It is not an official product of any institution or hospital, and it has not been reviewed, validated or endorsed by one. The views and any errors are the author’s own.',
@@ -4322,7 +4350,21 @@ function buildShell(){
   const saveBtn = $('#save');
   saveBtn.addEventListener('click', async () => { saveBtn.disabled = true; saveBtn.textContent = 'Saving'; try { await saveCurrent(false); } finally { saveBtn.disabled = false; saveBtn.replaceChildren('Save', el('span', { class: 'lg' }, ' study')); } });
   bind(() => { const st = $('#savest'); st.textContent = current.id ? (dirty ? 'Unsaved changes' : 'Saved') : (dirty ? 'Not saved' : ''); st.classList.toggle('warn', dirty); });
-  twice($('#new'), 'New study', () => { const had = filled(INPUTS); loadStudy(blankStudy()); if (had) toast('New study started', 'Undo', undo); else toast('New study started'); });
+  const collapseEverything = () => {
+    for (const n of $$('.sec, .calc')){ const t = n.querySelector('button.sec-t'); if (!t || n.classList.contains('closed')) continue; n.classList.add('closed'); t.setAttribute('aria-expanded', 'false'); }       // only blocks that have their own open/close button
+    for (const d of $$('details.figfold')) if (d.open) d.open = false;
+    saveFolds(); };
+  const startNewCase = () => { const had = filled(INPUTS); loadStudy(blankStudy()); collapseEverything();
+    const q = $('#page-echo input[type=search]'); if (q && q.value){ q.value = ''; q.dispatchEvent(new Event('input', { bubbles: true })); }
+    const all = $('#page-echo button[data-v=""]'); if (all) all.click();
+    location.hash = 'echo'; setTimeout(() => window.scrollTo(0, 0), 0);
+    if (had) toast('New case started', 'Undo', undo); else toast('New case started'); };
+  /* asks for a second tap only when there is something to lose; works for any button marked as a new-case button */
+  document.addEventListener('click', e => { const btn = e.target.closest ? e.target.closest('#new, [data-newcase]') : null; if (!btn) return;
+    if (!btn._label) btn._label = btn.textContent;
+    if (btn._armed || !filled(INPUTS)){ clearTimeout(btn._armed); btn._armed = 0; btn.textContent = btn._label; startNewCase(); }
+    else { btn.textContent = matchMedia('(max-width:820px)').matches ? 'Tap again' : 'Click again to confirm'; btn._armed = setTimeout(() => { btn._armed = 0; btn.textContent = btn._label; }, 3000); } });
+  if (!ackDate()) showAck(false);
   twice($('#example'), 'Load example', () => { loadStudy(exampleStudy()); toast('Example study loaded'); });
   $('#theme').addEventListener('click', () => {
     const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
