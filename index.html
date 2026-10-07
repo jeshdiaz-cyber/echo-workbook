@@ -464,6 +464,13 @@ td.dd{background:color-mix(in srgb,var(--warn-bg) 55%,transparent)}
 @media (max-width:820px){ .sitefoot{margin:8px 14px 0} }
 @media print{ .sitefoot{display:none} }
 
+.glance.chips{align-items:start}
+.glance.chips dt{padding-top:3px}
+.glance.chips dd .num{display:inline-block; padding-top:3px}
+.glance.chips dd .num{margin-right:6px}
+.glance.chips dd .num:empty{margin-right:0}
+.glance.chips dd:not(:has(.chip:not(:empty)))::after{display:inline-block; padding-top:3px}
+
 </style>
 </head>
 <body>
@@ -3077,13 +3084,21 @@ page('overview', 'Study overview', 'start', root => {
   bind(() => { const f = fmt('Report!B4'); statement.textContent = f.t; card.classList.toggle('crit', f.t.startsWith('CRITICAL')); });
   const items = [['LVEF', 'Echo!D43', 'Echo!B43', '%'], ['LV geometry', 'Echo!D34'], ['Wall motion', 'Wall Motion!D29'], ['Diastolic function, ASE 2025', 'Diastology 2025!D91'], ['Diastolic function, ASE/EACVI 2016', 'Echo!D200'],
     ['RV systolic function', 'Echo!D220'], ['Aortic stenosis', 'Echo!D96'], ['Aortic regurgitation', 'Echo!D110'], ['Mitral stenosis', 'Echo!D125'], ['Mitral regurgitation', 'Echo!D144'], ['Tricuspid regurgitation', 'Echo!D157'],
-    ['Pulmonary hypertension', 'Echo!D238'], ['Right atrial pressure', 'Echo!D225', 'Echo!B225', ' mmHg'], ['Aorta', 'Echo!D255'], ['Pericardium', 'Echo!D258'], ['Prosthetic valves', 'Prosthetic Valves!D108']];
+    ['Pulmonary hypertension', 'Echo!D238'], ['Right atrial pressure', 'Echo!D225', 'Echo!B225', ' mmHg'], ['Aorta', 'Echo!D255'], ['Pericardium', 'Echo!D258']];
   const dl = el('dl', { class: 'glance chips' });
   for (const [t, kd, kv, u] of items){
     const dd = el('dd', null, chip(kd));
     if (kv){ const v = el('span', { class: 'num' }); bind(() => { const f = fmt(kv); v.textContent = f.t ? f.t + u + '  ' : ''; }); dd.prepend(v); }
     add(dl, el('dt', null, t), dd);
   }
+  /* prosthetic valves: one line per prosthesis, in the same form as the native valves (type, then stenosis and regurgitation results) */
+  { const PV = 'Prosthetic Valves!', rowsPV = [['Aortic prosthesis', 'B6', 'B39', 'B52'], ['Mitral prosthesis', 'B55', 'B65', 'B78'], ['Tricuspid prosthesis', 'B81', 'B89', 'B95'], ['Pulmonary prosthesis', 'B98', 'B101', 'B105']];
+    const has = k => { const v = g(PV + k); return typeof v === 'string' && v !== '' && v !== 'None'; };
+    const short = k => { const ch = el('span', { class: 'chip' }); bind(() => { const t = fmt(PV + k).t, s2 = t.split(' — ')[0]; ch.textContent = s2; ch.className = 'chip ' + (s2 ? tone(t) : ''); ch.hidden = !s2; }); return ch; };
+    const dtN = el('dt', null, 'Prosthetic valves'), ddN = el('dd'); add(dl, dtN, ddN);
+    bind(() => { const any = rowsPV.some(r => has(r[1])); dtN.hidden = ddN.hidden = any; });
+    for (const [name, kt, ks, kr] of rowsPV){ const ty = el('span', { class: 'num' }), dt = el('dt', null, name), dd = el('dd', null, ty, short(ks), ' ', short(kr));
+      bind(() => { const on = has(kt); dt.hidden = dd.hidden = !on; ty.textContent = on ? g(PV + kt) + '  ' : ''; }); add(dl, dt, dd); } }
   const glance = el('section', { class: 'card' }, el('h2', null, 'Interpretation at a glance'), dl);
   const be = bullseye('score', true);
   const wm = el('section', { class: 'card' }, el('h2', null, 'Wall motion'), be, vtext('p', 'Wall Motion!D29', 'p-ref'));
